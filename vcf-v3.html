@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Excel to VCF Converter</title>
+</head>
+
+<body>
+  <div id="app">
+    <h1>Excel to VCF Converter</h1>
+    <input type="text" v-model="block" placeholder="">
+
+    <p>上传文件：</p>
+    <input type="file" id="excelFileInput" accept=".xlsx, .xls" @change="uploadFile" />
+
+    <button @click="convertToVCF">VCF转换</button>
+    <p id="result">{{resultMsg}}</p>
+  </div>
+
+
+  <!-- FirstName: 名字
+  LastName: 姓氏
+  Phone: 电话号码
+  Email: 电子邮件地址
+  Organization: 组织机构
+  Title: 职位
+  Address: 地址
+  Birthday: 生日 -->
+
+
+  <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
+  <script src="https://unpkg.com/xlsx@0.17.0/dist/xlsx.full.min.js"></script>
+
+  <script type="module">
+    import { createApp, ref } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
+    createApp({
+      setup() {
+        let block = ref(50);
+        let fileName = ref('');
+        let resultMsg = ref('');
+        const uploadFile = (file) => {
+          console.log('uploadFile', file.target.files[0].name)
+          fileName.value = (fileNameExtension(file.target.files[0].name)?.fileName) || 'contacts';
+          resultMsg.value = '';
+        }
+
+        function fileNameExtension(filePath) {
+          // 使用正则表达式匹配文件名和扩展名
+          const match = filePath.match(/([^\\/:*?"<>|\r\n]+)[.](\w+)$/);
+          if (match) {
+            const fileName = match[1]; // 文件名
+            const fileExtension = match[2]; // 文件扩展名
+
+            return {
+              fileName: fileName,
+              fileExtension: fileExtension
+            };
+          } else {
+            // 如果没有匹配到，则返回空字符串
+            return {
+              fileName: '',
+              fileExtension: ''
+            };
+          }
+        }
+
+        function chunkArray(array, size) {
+          let result = [];
+          for (let i = 0; i < array.length; i += size) {
+            let chunk = array.slice(i, i + size);
+            result.push(chunk);
+          }
+          return result;
+        }
+
+        function pause(msec) {
+          return new Promise(
+            (resolve, reject) => {
+              setTimeout(resolve, msec || 1000);
+            }
+          );
+        }
+
+        function downFile(group, index = 0) {
+          const vcfContent = group.map(row => {
+            return `
+BEGIN:VCARD
+VERSION:3.0
+N:${row.LastName || ''};${row.name1 || ''}${row.name2 || ''};${row.FirstName || ''};
+FN:${row.FirstName || ''} ${row.LastName || ''}
+TEL;TYPE=WORK,VOICE:${row.Phone || ''}
+EMAIL;TYPE=PREF,INTERNET:${row.Email || ''}
+ADR;TYPE=WORK:;;${row.Address || ''};;;;;
+TITLE:${row.Title || ''}
+ORG:${row.Organization || ''}
+BDAY:${row.Birthday || ''}
+END:VCARD`;
+          }).join('\n');
+
+          // 创建 Blob 对象
+          const blob = new Blob([vcfContent], { type: 'text/vcard;charset=utf-8' });
+          // 创建下载链接
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${fileName}_${index + 1}.vcf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // 清除临时 URL
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+        }
+
+        function convertToVCF() {
+          const fileInput = document.getElementById('excelFileInput');
+          if (fileInput.files.length === 0) {
+            alert('请先上传文件');
+            return;
+          }
+
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+
+          reader.onload = async function (e) {
+            const data = e.target.result;
+            const workbook = XLSX.read(data, { type: 'binary' });
+
+            // 假设只有一个工作表
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+
+            // 解析 Excel 数据
+            const excelData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (Number(block.value) === 0) {
+              downFile(excelData);
+            } else {
+              // 分组数据
+              const groupedData = chunkArray(excelData, block.value);
+              console.log('groupedData', groupedData, excelData)
+              let count = 0; // 已下载的文件数
+              // 逐组转换为 VCF 并下载
+              for (let index = 0; index < groupedData.length; index++) {
+                // console.log(index)
+                downFile(groupedData[index], index);
+                // 解决浏览器下载限制
+                if (++count >= 10) {
+                  await pause(1000);
+                  count = 0;
+                }
+              };
+            }
+
+            // document.getElementById('result').textContent = 'Downloaded VCF files.';
+            resultMsg.value = 'Downloaded VCF files.';
+          };
+          reader.readAsBinaryString(file);
+        }
+
+        return {
+          block,
+          uploadFile,
+          convertToVCF,
+          resultMsg
+        }
+      }
+    }).mount('#app')
+
+
+    // const app = Vue.createApp({
+    //   data() {
+    //     return {
+    //       message: 'Hello Vue 3!',
+    //       file: []
+    //     }
+    //   }
+    // });
+    // app.mount('#app');
+  </script>
+</body>
+
+</html>
