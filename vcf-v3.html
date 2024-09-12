@@ -40,7 +40,7 @@
         let fileName = ref('');
         let resultMsg = ref('');
         const uploadFile = (file) => {
-          console.log('uploadFile', file.target.files[0].name)
+          // console.log('uploadFile', file.target.files[0].name)
           fileName.value = (fileNameExtension(file.target.files[0].name)?.fileName) || 'contacts';
           resultMsg.value = '';
         }
@@ -87,7 +87,7 @@
             return `
 BEGIN:VCARD
 VERSION:3.0
-N:${row.LastName || ''};${row.name1 || ''}${row.name2 || ''};${row.FirstName || ''};
+N:${row.LastName || ''};${row.name1 ? '-'+row.name1 : ''}${row.name2 ? '-'+row.name2 : ''};${row.FirstName || ''};
 FN:${row.FirstName || ''} ${row.LastName || ''}
 TEL;TYPE=WORK,VOICE:${row.Phone || ''}
 EMAIL;TYPE=PREF,INTERNET:${row.Email || ''}
@@ -104,7 +104,7 @@ END:VCARD`;
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `${fileName}_${index + 1}.vcf`;
+          link.download = `${fileName.value}_${index + 1}.vcf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
